@@ -42,13 +42,3 @@ This project includes GitHub Actions CI/CD for automated building and deployment
 See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed setup instructions.
 
 ## TODO:
-[x] Auction item card doesn't show starting price inside card itself
-[x] Auction item card should have "Bid" button instead of "Buy"
-[x] "Bid" button should ask for how much bid is
-[x] Buyer can bid on auction
-[x] If auction is ended, highest bidder wins
-[x] If auction is ended, highest bidder gets item
-[x] Auction item should show history of all bids on this item to all users
-[x] Seller can select minimal bid step in auction items
-[x] github actions CI for building docker image to GHCR of same repo
-[x] github actions CD for deploying docker compose to remote host via ssh, provisioning ADMIN_USERNAME, ADMIN_PASSWORD and JWT_SECRET from github action secrets
