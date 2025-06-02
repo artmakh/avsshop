@@ -53,3 +53,6 @@ next-env.d.ts
 !/data/db/.gitkeep
 /data/uploads/*
 !/data/uploads/.gitkeep
+
+# Ignore vibecoding
+.claude
