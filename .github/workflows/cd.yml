@@ -1,0 +1,85 @@
+name: CD - Deploy to Remote Host
+
+on:
+  push:
+    branches: [ main ]
+  workflow_run:
+    workflows: ["CI - Build and Push Docker Image"]
+    types:
+      - completed
+    branches: [ main ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'push' }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+    - name: Deploy to remote host
+      uses: appleboy/ssh-action@2ead5e36573f08b82fbfce1504f1a4b05a647c6f # v1.2.2
+      with:
+        host: ${{ secrets.DEPLOY_HOST }}
+        username: ${{ secrets.DEPLOY_USER }}
+        key: ${{ secrets.DEPLOY_SSH_KEY }}
+        port: ${{ secrets.DEPLOY_PORT || 22 }}
+        script: |
+          # Navigate to deployment directory
+          cd ${{ secrets.DEPLOY_PATH || '/opt/salomarket' }}
+
+          # Create deployment directory if it doesn't exist
+          mkdir -p ${{ secrets.DEPLOY_PATH || '/opt/salomarket' }}
+          cd ${{ secrets.DEPLOY_PATH || '/opt/salomarket' }}
+
+          # Clone or update repository
+          if [ ! -d ".git" ]; then
+            git clone https://github.com/${{ github.repository }}.git .
+          else
+            git fetch origin
+            git reset --hard origin/main
+          fi
+
+          # Create environment file with secrets
+          cat > .env << EOF
+          ADMIN_USERNAME=${{ secrets.ADMIN_USERNAME }}
+          ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          DOCKER_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          EOF
+
+          # Login to GitHub Container Registry
+          echo ${{ secrets.GITHUB_TOKEN }} | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+
+          # Pull latest image
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+          # Stop and remove existing containers
+          docker-compose -f docker-compose.prod.yml down
+
+          # Start services with new image
+          docker-compose -f docker-compose.prod.yml up -d
+
+          # Clean up old images
+          docker image prune -f
+
+          # Verify deployment
+          sleep 10
+          curl -f http://localhost:3000 || exit 1
+
+          echo "Deployment completed successfully!"
+
+    - name: Notify deployment status
+      if: always()
+      run: |
+        if [ "${{ job.status }}" == "success" ]; then
+          echo "✅ Deployment to ${{ secrets.DEPLOY_HOST }} completed successfully!"
+        else
+          echo "❌ Deployment to ${{ secrets.DEPLOY_HOST }} failed!"
+          exit 1
+        fi
